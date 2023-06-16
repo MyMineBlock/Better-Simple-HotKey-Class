@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 
-namespace NLMMB.Src
+namespace Hotkeys
 {
     public sealed class HotkeyManager : IDisposable
     {
