@@ -50,7 +50,7 @@ namespace Hotkeys
         }
 
         readonly private Window _window = new Window();
-        private readonly int _currentId = 0;
+        private int _currentId = 0;
 
         public HotkeyManager()
         {
