@@ -1,12 +1,12 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 
-namespace Hotkeys
+namespace MyMineBlock
 {
-    public sealed class HotkeyManager : IDisposable
+    public sealed class HotKeyManager : IDisposable
     {
         [DllImport("user32.dll")]
         private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
@@ -30,16 +30,11 @@ namespace Hotkeys
                 {
                     Keys key = (Keys)(((int)m.LParam >> 16) & 0xFFFF);
                     ModKeys modifier = (ModKeys)((int)m.LParam & 0xFFFF);
-                    ThreadPool.QueueUserWorkItem(HandleHotkey, new KeyPressedEventArgs(modifier, key));
+                    windowKeyPressed?.Invoke(this, new KeyPressedEventArgs(modifier, key));
                 }
             }
 
-            public void HandleHotkey(object state)
-            {
-                KeyPressed?.Invoke(this, (KeyPressedEventArgs)state);
-            }
-
-            public event EventHandler<KeyPressedEventArgs> KeyPressed;
+            public event EventHandler<KeyPressedEventArgs> windowKeyPressed;
 
             #region IDisposable Members
             public void Dispose()
@@ -49,51 +44,54 @@ namespace Hotkeys
             #endregion
         }
 
-        readonly private Window _window = new Window();
-        private int _currentId = 0;
+        readonly private Window window = new Window();
+        private int currentId = 0;
 
-        public HotkeyManager()
+        public HotKeyManager()
         {
-            _window.KeyPressed += delegate (object HotkeySender, KeyPressedEventArgs args)
+            window.windowKeyPressed += delegate (object HotKeySender, KeyPressedEventArgs args)
             {
-                KeyPressed?.Invoke(this, args);
+                keyPressed?.Invoke(this, args);
             };
         }
 
-        private  readonly List<int> _registeredHotkeyIds = new List<int>();
+        private readonly List<HotKey> registeredHotkeys = new List<HotKey>();
 
         public void RegisterHotKey(ModKeys modifier, Keys key)
         {
             uint fsModifiers = (uint)modifier | (uint)ModKeys.NoRepeat;
-            if (RegisterHotKey(_window.Handle, _currentId, fsModifiers, (uint)key))
+            if (RegisterHotKey(window.Handle, currentId, fsModifiers, (uint)key))
             {
-                _registeredHotkeyIds.Add(_currentId);
+                HotKey newHotKey = new HotKey
+                {
+                    Modifier = modifier,
+                    Key = key,
+                    Id = currentId
+                };
+                registeredHotkeys.Add(newHotKey);
+                currentId++;
             }
         }
 
         #region IDisposable Members
         public void Dispose()
         {
-            foreach (int hotkeyId in _registeredHotkeyIds)
+            for (int i = currentId; i > -1; i--)
             {
-                UnregisterHotKey(_window.Handle, hotkeyId);
+                UnregisterHotKey(window.Handle, i);
             }
+            currentId = 0;
+            registeredHotkeys.Clear();
         }
         #endregion
 
-        public static event EventHandler<KeyPressedEventArgs> KeyPressed;
+        public static event EventHandler<KeyPressedEventArgs> keyPressed;
     }
 
     public class KeyPressedEventArgs : EventArgs
     {
         private readonly ModKeys _modkey;
         private readonly Keys _key;
-
-        internal KeyPressedEventArgs(ModKeys modkey, Keys key)
-        {
-            _modkey = modkey;
-            _key = key;
-        }
 
         public ModKeys Modkey
         {
@@ -104,6 +102,19 @@ namespace Hotkeys
         {
             get { return _key; }
         }
+
+        internal KeyPressedEventArgs(ModKeys modkey, Keys key)
+        {
+            _modkey = modkey;
+            _key = key;
+        }
+    }
+
+    public class HotKey
+    {
+        public ModKeys Modifier { get; set; }
+        public Keys Key { get; set; }
+        public int Id { get; set; }
     }
 
     [Flags]
