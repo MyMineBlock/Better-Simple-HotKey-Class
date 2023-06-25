@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using System.Threading;
 using System.Windows.Forms;
 
 namespace MyMineBlock
@@ -44,23 +43,22 @@ namespace MyMineBlock
             #endregion
         }
 
-        readonly private Window window = new Window();
+        readonly private Window listenerWindow = new Window();
         private int currentId = 0;
 
         public HotKeyManager()
         {
-            window.windowKeyPressed += delegate (object HotKeySender, KeyPressedEventArgs args)
+            listenerWindow.windowKeyPressed += delegate (object HotKeySender, KeyPressedEventArgs args)
             {
                 keyPressed?.Invoke(this, args);
             };
         }
-
-        private readonly List<HotKey> registeredHotkeys = new List<HotKey>();
+        
+        private readonly List<HotKey> registeredHotKeys = new List<HotKey>();
 
         public void RegisterHotKey(ModKeys modifier, Keys key)
         {
-            uint fsModifiers = (uint)modifier | (uint)ModKeys.NoRepeat;
-            if (RegisterHotKey(window.Handle, currentId, fsModifiers, (uint)key))
+            if (RegisterHotKey(listenerWindow.Handle, currentId, (uint)modifier, (uint)key))
             {
                 HotKey newHotKey = new HotKey
                 {
@@ -68,7 +66,65 @@ namespace MyMineBlock
                     Key = key,
                     Id = currentId
                 };
-                registeredHotkeys.Add(newHotKey);
+                registeredHotKeys.Add(newHotKey);
+                currentId++;
+            }
+        }
+        public void RegisterHotKey(ModKeys[] modifiers, Keys key)
+        {
+            uint fsModifiers = 0;
+            foreach (ModKeys modifier in modifiers)
+            {
+                fsModifiers |= (uint)modifier;
+            }
+            if (RegisterHotKey(listenerWindow.Handle, currentId, fsModifiers, (uint)key))
+            {
+                HotKey newHotKey = new HotKey
+                {
+                    Modifiers = modifiers,
+                    Key = key,
+                    Id = currentId
+                };
+                registeredHotKeys.Add(newHotKey);
+                currentId++;
+            }
+        }
+
+        public void RegisterHotKeyNoRepeat(ModKeys modifier, Keys key)
+        {
+            uint fsModifiers = (uint)modifier | (uint)ModKeys.NoRepeat;
+            if (RegisterHotKey(listenerWindow.Handle, currentId, fsModifiers, (uint)key))
+            {
+                HotKey newHotKey = new HotKey
+                {
+                    Modifier = modifier,
+                    Key = key,
+                    Id = currentId
+                };
+                registeredHotKeys.Add(newHotKey);
+                currentId++;
+            }
+        }
+        public void RegisterHotKeyNoRepeat(ModKeys[] modifiers, Keys key)
+        {
+            uint fsModifiers = 0;
+            foreach (ModKeys modifier in modifiers)
+            {
+                if (modifier != ModKeys.NoRepeat)
+                {
+                    fsModifiers |= (uint)modifier;
+                }
+            }
+            fsModifiers |= (uint)ModKeys.NoRepeat;
+            if (RegisterHotKey(listenerWindow.Handle, currentId, fsModifiers, (uint)key))
+            {
+                HotKey newHotKey = new HotKey
+                {
+                    Modifiers = modifiers,
+                    Key = key,
+                    Id = currentId
+                };
+                registeredHotKeys.Add(newHotKey);
                 currentId++;
             }
         }
@@ -78,10 +134,11 @@ namespace MyMineBlock
         {
             for (int i = currentId; i > -1; i--)
             {
-                UnregisterHotKey(window.Handle, i);
+                UnregisterHotKey(listenerWindow.Handle, i);
             }
             currentId = 0;
-            registeredHotkeys.Clear();
+            registeredHotKeys.Clear();
+            keyPressed = null;
         }
         #endregion
 
@@ -110,9 +167,10 @@ namespace MyMineBlock
         }
     }
 
-    public class HotKey
+    public struct HotKey
     {
         public ModKeys Modifier { get; set; }
+        public ModKeys[] Modifiers { get; set; }
         public Keys Key { get; set; }
         public int Id { get; set; }
     }
